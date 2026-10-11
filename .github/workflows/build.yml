@@ -1,0 +1,361 @@
+name: Build LED Panel APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate project files
+        run: |
+          mkdir -p ledpanel/app/src/main/java/com/malek/ledpanel
+          mkdir -p ledpanel/app/src/main/res/values
+          mkdir -p ledpanel/app/src/main/res/drawable
+          mkdir -p ledpanel/app/src/main/assets
+          cd ledpanel
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "LedPanel"
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.malek.ledpanel'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId 'com.malek.ledpanel'
+                  minSdk 23
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+                  encoding 'UTF-8'
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:allowBackup="false"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="@string/app_name"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+                  android:usesCleartextTraffic="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">لوحة LED</string>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#111827" android:pathData="M0,0h108v108h-108z" />
+              <path android:fillColor="#EF4444" android:pathData="M13,35h16v16h-16z" />
+              <path android:fillColor="#F59E0B" android:pathData="M35,35h16v16h-16z" />
+              <path android:fillColor="#22C55E" android:pathData="M57,35h16v16h-16z" />
+              <path android:fillColor="#3B82F6" android:pathData="M79,35h16v16h-16z" />
+              <path android:fillColor="#A855F7" android:pathData="M13,57h16v16h-16z" />
+              <path android:fillColor="#EC4899" android:pathData="M35,57h16v16h-16z" />
+              <path android:fillColor="#14B8A6" android:pathData="M57,57h16v16h-16z" />
+              <path android:fillColor="#FACC15" android:pathData="M79,57h16v16h-16z" />
+          </vector>
+          EOF
+
+          cat > app/src/main/assets/error.html <<'EOF'
+          <!DOCTYPE html>
+          <html dir="rtl" lang="ar">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: sans-serif; background: #0f172a; color: #e5e7eb; padding: 24px; text-align: center; }
+            input { width: 80%; font-size: 18px; padding: 10px; margin: 12px 0; text-align: center; direction: ltr; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #fff; }
+            button { display: block; width: 80%; margin: 10px auto; font-size: 18px; padding: 14px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; }
+            button.alt { background: #475569; }
+            small { color: #94a3b8; }
+          </style>
+          </head>
+          <body>
+            <h2>ما قدرت اتصل باللوحة</h2>
+            <p>تأكد إنو الموبايل على نفس شبكة الواي فاي وإنو اللوحة شغّالة.</p>
+            <input id="h" value="%HOST%">
+            <button onclick="App.go(document.getElementById('h').value)">إعادة المحاولة</button>
+            <button class="alt" onclick="App.go('192.168.4.1')">شبكة اللوحة المباشرة (AP)</button>
+            <p><small>لو استخدمت الـ AP: وصّل الموبايل على شبكة "لوحة مالك" أول.</small></p>
+          </body>
+          </html>
+          EOF
+
+          cat > app/src/main/java/com/malek/ledpanel/MainActivity.java <<'EOF'
+          package com.malek.ledpanel;
+
+          import android.app.Activity;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.net.ConnectivityManager;
+          import android.net.Network;
+          import android.net.NetworkCapabilities;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceError;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+
+          public class MainActivity extends Activity {
+
+              static final String DEFAULT_HOST = "192.168.1.250";
+              static final String AP_HOST = "192.168.4.1";
+              static final int REQ_FILE = 1;
+
+              WebView web;
+              SharedPreferences prefs;
+              String saved;
+              boolean triedAp = false;
+              ValueCallback<Uri[]> fileCallback;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  prefs = getSharedPreferences("panel", Context.MODE_PRIVATE);
+                  saved = prefs.getString("host", DEFAULT_HOST);
+
+                  web = new WebView(this);
+                  setContentView(web);
+
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+
+                  web.addJavascriptInterface(new Bridge(), "App");
+
+                  web.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
+                          if (!r.isForMainFrame()) return;
+                          int c = e.getErrorCode();
+                          if (c != ERROR_HOST_LOOKUP && c != ERROR_CONNECT
+                                  && c != ERROR_TIMEOUT && c != ERROR_IO) return;
+                          if (!triedAp && !saved.equals(AP_HOST)) {
+                              triedAp = true;
+                              v.loadUrl("http://" + AP_HOST + "/");
+                          } else {
+                              showError();
+                          }
+                      }
+                  });
+
+                  web.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb,
+                                                       FileChooserParams params) {
+                          if (fileCallback != null) fileCallback.onReceiveValue(null);
+                          fileCallback = cb;
+                          Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                          i.addCategory(Intent.CATEGORY_OPENABLE);
+                          i.setType("image/*");
+                          try {
+                              startActivityForResult(Intent.createChooser(i, "اختر صورة"), REQ_FILE);
+                          } catch (Exception e) {
+                              fileCallback = null;
+                              return false;
+                          }
+                          return true;
+                      }
+                  });
+
+                  bindWifi();
+                  web.loadUrl("http://" + saved + "/");
+              }
+
+              // لو الواي فاي ما فيه إنترنت (متل شبكة اللوحة AP) أندرويد ممكن يمرّر الطلبات عالداتا، فبنربط التطبيق بالواي فاي
+              void bindWifi() {
+                  try {
+                      ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                      for (Network n : cm.getAllNetworks()) {
+                          NetworkCapabilities c = cm.getNetworkCapabilities(n);
+                          if (c != null && c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                              cm.bindProcessToNetwork(n);
+                              return;
+                          }
+                      }
+                  } catch (Exception ignored) {
+                  }
+              }
+
+              void showError() {
+                  String html = readAsset("error.html").replace("%HOST%", saved);
+                  web.loadDataWithBaseURL("http://localhost/", html, "text/html", "UTF-8", null);
+              }
+
+              String readAsset(String name) {
+                  try {
+                      InputStream in = getAssets().open(name);
+                      ByteArrayOutputStream out = new ByteArrayOutputStream();
+                      byte[] buf = new byte[4096];
+                      int n;
+                      while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                      in.close();
+                      return out.toString("UTF-8");
+                  } catch (Exception e) {
+                      return "<h2>Error</h2>";
+                  }
+              }
+
+              void connect(String input) {
+                  String h = input == null ? "" : input.trim();
+                  h = h.replace("http://", "").replace("https://", "");
+                  int slash = h.indexOf('/');
+                  if (slash >= 0) h = h.substring(0, slash);
+                  if (h.isEmpty()) h = DEFAULT_HOST;
+                  if (!h.equals(AP_HOST)) {
+                      saved = h;
+                      prefs.edit().putString("host", h).apply();
+                  }
+                  triedAp = h.equals(AP_HOST);
+                  bindWifi();
+                  web.loadUrl("http://" + h + "/");
+              }
+
+              class Bridge {
+                  @JavascriptInterface
+                  public void go(final String h) {
+                      runOnUiThread(new Runnable() {
+                          @Override
+                          public void run() {
+                              connect(h);
+                          }
+                      });
+                  }
+              }
+
+              @Override
+              protected void onActivityResult(int req, int res, Intent data) {
+                  if (req == REQ_FILE && fileCallback != null) {
+                      Uri[] result = null;
+                      if (res == RESULT_OK && data != null) {
+                          result = WebChromeClient.FileChooserParams.parseResult(res, data);
+                      }
+                      fileCallback.onReceiveValue(result);
+                      fileCallback = null;
+                  } else {
+                      super.onActivityResult(req, res, data);
+                  }
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  bindWifi();
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (web.canGoBack()) web.goBack();
+                  else super.onBackPressed();
+              }
+          }
+          EOF
+
+      - name: Build APK
+        working-directory: ledpanel
+        run: gradle assembleDebug --no-daemon
+
+      - name: Prepare APK
+        run: cp ledpanel/app/build/outputs/apk/debug/app-debug.apk LedPanel.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LedPanel-apk
+          path: LedPanel.apk
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: LED Panel v${{ github.run_number }}
+          files: LedPanel.apk
